@@ -16,18 +16,12 @@ import java.lang.Object;
 
 public class SecureClient {
 
-	// functionalities used in communication btw client and server
 	private static PrintWriter writer = null;
 	private static BufferedReader fromServer = null;
 	private static InputStream inputStream = null;
 	private static InputStreamReader inputStreamRe = null;
 	private static Socket socketClient = null;
 	private static Scanner in = null;
-
-	// Authentication
-	private static Boolean userAuth = false;
-	private static Boolean passAuth = false;
-
 	// Version of the file
 	int version;
 
@@ -41,19 +35,16 @@ public class SecureClient {
 	 */
 	public static void main(String args[]) throws IOException {
 
-		SecureClient myObje = new SecureClient();
+		SecureClient C = new SecureClient();
 		int port = Integer.parseInt(args[0]);
 
-		// to take the input from client
+		CryptoHelper crypto = new CryptoHelper();
 		inputStream = socketClient.getInputStream();
 		inputStreamRe = new InputStreamReader(inputStream);
 		fromServer = new BufferedReader(inputStreamRe);
 		writer = new PrintWriter(socketClient.getOutputStream(), true);
 		in = new Scanner(System.in);
-
-		CryptoHelper crypto = new CryptoHelper();
-
-
+		
 		while(true) {
 
 			socketClient = new Socket("127.0.0.1", port);
@@ -184,17 +175,31 @@ public class SecureClient {
 	}
 
 	private static byte[] getSignature(byte[] cert) {
-		// TODO Auto-generated method stub
+		
+		String s = cert.toString();
+		for(int i = 0; i< s.length(); i++)
+		{
+			
+		}
 		return null;
 	}
 
 	private static byte[] receiveHELLO() {
-		// TODO Auto-generated method stub
+		
+		try {
+			String responseFromServer = fromServer.readLine();
+			System.out.println(responseFromServer);
+			byte[] cert = (responseFromServer.substring(6)).getBytes();
+			return cert;
+		}
+		catch(IOException exc)
+		{
+			System.out.println("About Handshake" + exc.getMessage());
+		}
 		return null;
 	}
 
 	private static void sendHELLO() {
-		// TODO Auto-generated method stub
-
+		writer.println("HELLO");
 	}
 }
