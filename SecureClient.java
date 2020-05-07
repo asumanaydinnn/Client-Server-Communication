@@ -1,9 +1,9 @@
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.io.*;
 import java.util.*;
-import java.lang.Object;
 
 /**
  * Programming Assignment 2
@@ -16,14 +16,12 @@ import java.lang.Object;
 
 public class SecureClient {
 
-	private static PrintWriter writer = null;
-	private static BufferedReader fromServer = null;
 	private static InputStream inputStream = null;
-	private static InputStreamReader inputStreamRe = null;
+	private static ByteArrayOutputStream baos = null;
 	private static Socket socketClient = null;
-	private static Scanner in = null;
-	// Version of the file
-	int version;
+	static byte[] serverPublicKeys;
+    static OutputStream out = null;
+
 
 	/**
 	 * This is the main method
@@ -35,15 +33,13 @@ public class SecureClient {
 	 */
 	public static void main(String args[]) throws IOException {
 
-		SecureClient C = new SecureClient();
 		int port = Integer.parseInt(args[0]);
 
 		CryptoHelper crypto = new CryptoHelper();
 		inputStream = socketClient.getInputStream();
-		inputStreamRe = new InputStreamReader(inputStream);
-		fromServer = new BufferedReader(inputStreamRe);
-		writer = new PrintWriter(socketClient.getOutputStream(), true);
-		in = new Scanner(System.in);
+		baos = new ByteArrayOutputStream();
+		out =  socketClient.getOutputStream();
+
 		
 		while(true) {
 
@@ -58,20 +54,25 @@ public class SecureClient {
 			// Get necessary fields from the certificate
 			byte[] signature = getSignature(cert);
 			String ca = getCA(cert);
-			byte[] serverPublicKey = getPK(cert);
+			byte[] serverPublicKeys  = getPK(cert);
 
 			// Verification is successful:
 			if (crypto.verifySignature(cert, signature, ca)) 
+			{
+				System.out.println("success");
 				break;
-
+			}
 			// Verification fails:
 			else 
+			{
+				System.out.println("fail");
 				socketClient.close();
+			}
 		}
-
+		
 		// Create and send encrypted secret
 		int secret = crypto.generateSecret();
-		byte[] secretEncrypted = crypto.encryptSecretAsymmetric(secret, serverPublicKey);
+		byte[] secretEncrypted = crypto.encryptSecretAsymmetric(secret, serverPublicKeys);
 		sendSECRET(secretEncrypted);
 		// --- HANDSHAKE END
 
@@ -92,11 +93,11 @@ public class SecureClient {
 		// --- AUTHENTICATION END
 		// --- VIEW PUBLIC POSTS START
 		sendPUBLIC();
-		byte[] data = receiveRESPONSE();
+		byte[] dataResponse = receiveRESPONSE();
 
 		// Decode the byte array into a string & display
-		String response = decodeUS_ASCII(data);
-		print(response);
+		String responseData = decodeUS_ASCII(dataResponse);
+		print(responseData);
 		// --- VIEW PUBLIC POSTS END
 
 
@@ -105,9 +106,9 @@ public class SecureClient {
 		sendPRIVATE();
 
 		// Receive, decrypt & display
-		byte[] data = receiveRESPONSE();
-		String response = crypto.decryptSymmetric(data, secret);
-		print(response);
+		byte[] data3 = receiveRESPONSE();
+		String response3 = crypto.decryptSymmetric(data3, secret);
+		print(response3);
 
 		sendSTARTENC();  // End encryption
 		// --- VIEW PRIVATE MESSAGES END
@@ -119,14 +120,18 @@ public class SecureClient {
 
 	}
 
-	private static void sendLOGOUT() {
+	private static void sendLOGOUT() throws IOException {
 		// TODO Auto-generated method stub
-
+		String logout = "LOGOUT";
+		byte[] logoutByte = logout.getBytes(StandardCharsets.US_ASCII);
+		out.write(logoutByte);
 	}
 
-	private static void sendPRIVATE() {
+	private static void sendPRIVATE() throws IOException {
 		// TODO Auto-generated method stub
-
+		String privateT = "PRIVATE";
+		byte[] privateByte = privateT.getBytes(StandardCharsets.US_ASCII);
+		out.write(privateByte);
 	}
 
 	private static String decodeUS_ASCII(byte[] data) {
@@ -134,14 +139,15 @@ public class SecureClient {
 		return null;
 	}
 
-	private static void sendPUBLIC() {
-		// TODO Auto-generated method stub
-
+	private static void sendPUBLIC() throws IOException {
+		String publicT = "PUBLIC";
+		byte[] publicByte = publicT.getBytes(StandardCharsets.US_ASCII);
+		out.write(publicByte);
 	}
 
 	private static void print(String response) {
 		// TODO Auto-generated method stub
-
+		System.out.println("Response:" + response);
 	}
 
 	private static byte[] receiveRESPONSE() {
@@ -149,47 +155,50 @@ public class SecureClient {
 		return null;
 	}
 
-	private static void sendAUTH(byte[] authEncrypted) {
+	private static void sendAUTH(byte[] authEncrypted) throws IOException {
 		// TODO Auto-generated method stub
-
+		out.write(authEncrypted);
 	}
 
-	private static void sendSTARTENC() {
+	private static void sendSTARTENC() throws IOException {
 		// TODO Auto-generated method stub
-
+		String start = "STARTENC";
+		byte[] startByte = start.getBytes(StandardCharsets.US_ASCII);
+		out.write(startByte);
 	}
 
-	private static void sendSECRET(byte[] secretEncrypted) {
-		// TODO Auto-generated method stub
-
+	private static void sendSECRET(byte[] secretEncrypted) throws IOException  {
+		out.write(secretEncrypted);
 	}
 
-	private static byte[] getPK(byte[] cert) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	private static String getCA(byte[] cert) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	private static byte[] getSignature(byte[] cert) {
-		
-		String s = cert.toString();
-		for(int i = 0; i< s.length(); i++)
-		{
-			
+	private static byte[] getPK(byte[] cert) throws IOException {
+		 String cert_s = new String(cert);
+		  cert_s = cert_s.substring(cert_s.indexOf("PK=") + 3);
+		  cert_s = cert_s.substring(0, cert_s.indexOf("C"));
+		  byte[] pk = cert_s.getBytes(StandardCharsets.US_ASCII);
+		  return pk;
 		}
-		return null;
+
+	private static String getCA(byte[] cert) throws IOException  {
+		String cert_s = new String(cert);
+		  cert_s = cert_s.substring(cert_s.indexOf("CA=") + 3);
+		  cert_s = cert_s.substring(0, cert_s.indexOf("S"));
+		  return cert_s;
+	}
+
+	private static byte[] getSignature(byte[] cert) throws IOException 
+	{
+		byte[] signature =  Arrays.copyOfRange(cert, cert.length-8,cert.length);
+		return signature;
 	}
 
 	private static byte[] receiveHELLO() {
 		
 		try {
-			String responseFromServer = fromServer.readLine();
+			byte responseFromServer[] = new byte[1024];
+			baos.write(responseFromServer,0, inputStream.read(responseFromServer));
+			byte cert[] = baos.toByteArray();
 			System.out.println(responseFromServer);
-			byte[] cert = (responseFromServer.substring(6)).getBytes();
 			return cert;
 		}
 		catch(IOException exc)
@@ -199,7 +208,10 @@ public class SecureClient {
 		return null;
 	}
 
-	private static void sendHELLO() {
-		writer.println("HELLO");
+	private static void sendHELLO() throws IOException {
+		
+		String hello = "HELLO";
+		byte[] helloByte = hello.getBytes(StandardCharsets.US_ASCII);
+		out.write(helloByte);
 	}
 }
