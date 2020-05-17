@@ -38,24 +38,28 @@ public class SecureClient {
 
   
   CryptoHelper crypto = new CryptoHelper();
-  
+  int attempt = 1;
   byte[] cert; byte[] signature; byte[] serverPublicKeys;
 
   while(true){
     
    int p = Integer.parseInt(args[0]);
    socketClient = new Socket("127.0.0.1", p);
-   int port = 60000;
+    
+    System.out.println("\nAttempt # " +attempt);
+   System.out.println("Connection is started.");
+   
    inputStream = socketClient.getInputStream();
    baos = new ByteArrayOutputStream();
    out =  socketClient.getOutputStream();
+   
     sendHELLO();
     cert =  new byte[0]; 
     cert  = receiveHELLO();
     signature = getSignature(cert);
     String ca = getCA(cert);
     serverPublicKeys  = getPK(cert);
-   
+
    // Verification is successful:
    if (crypto.verifySignature(cert, signature, ca)) 
    {
@@ -68,11 +72,11 @@ public class SecureClient {
     System.out.println("fail");
     socketClient.close();
    }
+   attempt++;
   }
   
   // Create and send encrypted secret
   int secret = crypto.generateSecret();
-  
   byte[] secretEncrypted = crypto.encryptSecretAsymmetric(secret, serverPublicKeys);
   
   sendSECRET(secretEncrypted);
@@ -193,8 +197,7 @@ public class SecureClient {
     }
     catch(IOException exc)
     {
-      System.out.println(exc.getMessage());
-
+      System.out.println("About Handshake" + exc.getMessage());
     }
    return data;
  }
@@ -241,11 +244,13 @@ public class SecureClient {
   byte[] secretByte = secret.getBytes(StandardCharsets.US_ASCII);
   int length1 = secretEncrypted.length;
   byte[] size = ByteBuffer.allocate(4).putInt(length1).array();
+
   ByteArrayOutputStream baos = new ByteArrayOutputStream();
   baos.write(secretByte);
   baos.write(size);
   baos.write(secretEncrypted);
   byte[] c = baos.toByteArray();
+
   out.write(c);
  }
 
@@ -295,9 +300,10 @@ public class SecureClient {
   }
   catch(IOException exc)
   {
-   System.out.println(exc.getMessage());
+   System.out.println("About Handshake" + exc.getMessage());
    return null;
   }
+  //return null;
  }
 
  private static void sendHELLO() throws IOException {
